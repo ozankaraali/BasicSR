@@ -33,7 +33,7 @@ class BaseModel():
         """Save networks and training state."""
         pass
 
-    def validation(self, dataloader, current_iter, tb_logger, save_img=False):
+    def validation(self, dataloader, current_iter, tb_logger, save_img=False, rgb2bgr=True, use_image=True):
         """Validation function.
 
         Args:
@@ -41,11 +41,13 @@ class BaseModel():
             current_iter (int): Current iteration.
             tb_logger (tensorboard logger): Tensorboard logger.
             save_img (bool): Whether to save images. Default: False.
+            rgb2bgr (bool): Whether to save images using rgb2bgr. Default: True, NAFNet feature, deprecated.
+            use_image (bool): Whether to use saved images to compute metrics (PSNR, SSIM), if not, then use data directly from network' output. Default: True, NAFNet feature, deprecated.
         """
         if self.opt['dist']:
-            self.dist_validation(dataloader, current_iter, tb_logger, save_img)
+            return self.dist_validation(dataloader, current_iter, tb_logger, save_img)#, rgb2bgr, use_image)
         else:
-            self.nondist_validation(dataloader, current_iter, tb_logger, save_img)
+            self.nondist_validation(dataloader, current_iter, tb_logger, save_img)#, rgb2bgr, use_image)
 
     def _initialize_best_metric_results(self, dataset_name):
         """Initialize the best metric results dict for recording the best metric value and iteration."""
@@ -128,7 +130,24 @@ class BaseModel():
                 self.schedulers.append(lr_scheduler.MultiStepRestartLR(optimizer, **train_opt['scheduler']))
         elif scheduler_type == 'CosineAnnealingRestartLR':
             for optimizer in self.optimizers:
-                self.schedulers.append(lr_scheduler.CosineAnnealingRestartLR(optimizer, **train_opt['scheduler']))
+                self.schedulers.append(
+                    lr_scheduler.CosineAnnealingRestartLR(
+                        optimizer, **train_opt['scheduler']))
+        elif scheduler_type == 'TrueCosineAnnealingLR':
+            print('..', 'cosineannealingLR')
+            for optimizer in self.optimizers:
+                self.schedulers.append(
+                    torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, **train_opt['scheduler']))
+        elif scheduler_type == 'LinearLR':
+            for optimizer in self.optimizers:
+                self.schedulers.append(
+                    lr_scheduler.LinearLR(
+                        optimizer, train_opt['total_iter']))
+        elif scheduler_type == 'VibrateLR':
+            for optimizer in self.optimizers:
+                self.schedulers.append(
+                    lr_scheduler.VibrateLR(
+                        optimizer, train_opt['total_iter']))
         else:
             raise NotImplementedError(f'Scheduler {scheduler_type} is not implemented yet.')
 
